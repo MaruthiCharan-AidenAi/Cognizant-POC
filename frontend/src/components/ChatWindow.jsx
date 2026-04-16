@@ -1,9 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSSE } from '../hooks/useSSE'
-import { apiUrl, generateSessionId } from '../utils/api'
+import { apiFetch, apiUrl, generateSessionId } from '../utils/api'
 import MessageBubble from './MessageBubble'
 import TypingIndicator from './TypingIndicator'
 import ErrorBanner from './ErrorBanner'
+
+const DEFAULT_SUGGESTIONS = [
+  'Which companies are furthest below their revenue target this quarter?',
+  'Show actual revenue vs target by pod for the current quarter.',
+  'Which pods have the lowest session completion rate right now?',
+  'What is the revenue trend by quarter, and where did momentum change?',
+]
 
 /**
  * ChatWindow — full-height chat interface with SSE streaming.
@@ -16,6 +23,7 @@ import ErrorBanner from './ErrorBanner'
 export default function ChatWindow({ token, user, onSignOut }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  const [suggestions, setSuggestions] = useState(DEFAULT_SUGGESTIONS)
   const [error, setError] = useState(null)
   const [waitingForFirstToken, setWaitingForFirstToken] = useState(false)
   const [sessionId] = useState(() => generateSessionId())
@@ -35,6 +43,29 @@ export default function ChatWindow({ token, user, onSignOut }) {
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadSuggestions() {
+      if (!token) return
+      try {
+        const data = await apiFetch('/suggestions', { token })
+        if (active && Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
+          setSuggestions(data.suggestions)
+        }
+      } catch (err) {
+        if (active) {
+          setSuggestions(DEFAULT_SUGGESTIONS)
+        }
+      }
+    }
+
+    loadSuggestions()
+    return () => {
+      active = false
+    }
+  }, [token])
 
   const handleSend = useCallback(async () => {
     const trimmed = input.trim()
@@ -185,12 +216,7 @@ export default function ChatWindow({ token, user, onSignOut }) {
               to your role and region.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg w-full">
-              {[
-                'How many orders were placed last month?',
-                'What is the revenue trend over time?',
-                'Which traffic source drives the most orders?',
-                'Show me the top 10 days by order count',
-              ].map((suggestion, i) => (
+              {suggestions.map((suggestion, i) => (
                 <button
                   key={i}
                   id={`suggestion-${i}`}

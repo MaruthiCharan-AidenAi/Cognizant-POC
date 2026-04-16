@@ -61,6 +61,38 @@ function isNumericLike(value) {
   return value !== null && value !== '' && !Number.isNaN(Number(value))
 }
 
+function isLikelyIdentifierKey(key) {
+  return /(^|_)(id|ldap)(_|$)/i.test(key)
+}
+
+function scoreCategoryKey(key) {
+  if (/(name|pod|program|market|region|quarter|date|status|owner|supervisor)/i.test(key)) {
+    return 3
+  }
+  if (isLikelyIdentifierKey(key)) return -1
+  return 1
+}
+
+function scoreNumericKey(key) {
+  if (/(attainment|percent|percentage|pct|rate|revenue|target|score|points|sessions|count|total|avg|forecast|delta|gap)/i.test(key)) {
+    return 3
+  }
+  if (isLikelyIdentifierKey(key)) return -1
+  return 1
+}
+
+function pickBestCategoryKey(keys, categoryKeys) {
+  const candidates = (categoryKeys.length > 0 ? categoryKeys : keys).slice()
+  return candidates.sort((a, b) => scoreCategoryKey(b) - scoreCategoryKey(a))[0] || keys[0] || 'x'
+}
+
+function pickBestNumericKey(keys, numericKeys, excludedKeys = []) {
+  const excluded = new Set(excludedKeys)
+  const candidates = numericKeys.filter((key) => !excluded.has(key))
+  const ranked = (candidates.length > 0 ? candidates : numericKeys).slice()
+  return ranked.sort((a, b) => scoreNumericKey(b) - scoreNumericKey(a))[0] || keys[1] || keys[0] || 'y'
+}
+
 /** Accept raw model output; coerce type, data arrays, and keys. */
 export function normalizeChartSpec(raw) {
   if (!raw || typeof raw !== 'object') return null
@@ -100,11 +132,12 @@ export default function ChartRenderer({ spec: rawSpec }) {
   const numericKeys = keys.filter((key) => isNumericLike(sample[key]))
   const categoryKeys = keys.filter((key) => !isNumericLike(sample[key]))
 
-  const inferredXKey = categoryKeys[0] || keys[0] || 'x'
-  const inferredYKey = numericKeys[0] || keys[1] || keys[0] || 'y'
+  const inferredXKey = pickBestCategoryKey(keys, categoryKeys)
+  const inferredYKey = pickBestNumericKey(keys, numericKeys, [inferredXKey])
 
   const xKey = spec.x_key && keys.includes(spec.x_key) ? spec.x_key : inferredXKey
   let yKey = spec.y_key && keys.includes(spec.y_key) ? spec.y_key : inferredYKey
+  let resolvedXKey = xKey
 
   const title = spec.title || 'Chart'
   const chartData = data.map((row) => {
@@ -115,10 +148,53 @@ export default function ChartRenderer({ spec: rawSpec }) {
     return out
   })
 
-  const chartHeight = isNarrow ? 252 : 300
+  const xIsNumeric = isNumericLike(sample[resolvedXKey])
+  const yIsNumeric = isNumericLike(sample[yKey])
+
+  if (chartType === 'horizontal_bar') {
+    if (xIsNumeric && !yIsNumeric) {
+      const swappedXKey = categoryKeys.find((key) => key !== yKey) || yKey
+      const swappedYKey = pickBestNumericKey(keys, numericKeys, [swappedXKey])
+      resolvedXKey = swappedXKey
+      yKey = swappedYKey
+    } else {
+      if (!categoryKeys.includes(resolvedXKey)) {
+        resolvedXKey = pickBestCategoryKey(keys, categoryKeys)
+      }
+      if (!isNumericLike(sample[yKey])) {
+        yKey = pickBestNumericKey(keys, numericKeys, [resolvedXKey])
+      }
+    }
+  } else {
+    if (!isNumericLike(sample[yKey])) {
+      yKey = pickBestNumericKey(keys, numericKeys, [resolvedXKey])
+    }
+    if (isNumericLike(sample[resolvedXKey]) && categoryKeys.length > 0) {
+      resolvedXKey = pickBestCategoryKey(keys, categoryKeys)
+    }
+    if (!isNumericLike(sample[yKey]) && categoryKeys.includes(yKey) && isNumericLike(sample[resolvedXKey])) {
+      const temp = resolvedXKey
+      resolvedXKey = yKey
+      yKey = temp
+    }
+  }
+
+  const averageCategoryLength =
+    chartData.reduce((sum, row) => sum + String(row[resolvedXKey] ?? '').length, 0) /
+    Math.max(chartData.length, 1)
+  if (chartType === 'bar' && chartData.length >= 8 && averageCategoryLength >= 10) {
+    chartType = 'horizontal_bar'
+  }
+
+  const chartHeight =
+    chartType === 'horizontal_bar'
+      ? Math.min(Math.max(chartData.length * (isNarrow ? 30 : 34), isNarrow ? 260 : 300), 560)
+      : isNarrow
+        ? 252
+        : 300
   const yAxisW = isNarrow ? 40 : 48
   const yAxisRightW = isNarrow ? 34 : 48
-  const hBarCategoryW = isNarrow ? 92 : 100
+  const hBarCategoryW = Math.min(Math.max(averageCategoryLength * (isNarrow ? 7 : 8), isNarrow ? 110 : 130), 220)
   const manyXTicks = chartData.length > (isNarrow ? 5 : 9)
   const xAxisTickProps =
     manyXTicks && isNarrow
@@ -140,7 +216,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
     spec.y_keys?.filter((k) => keys.includes(k) && isNumericLike(sample[k])) ?? null
   if (chartType === 'stacked_bar') {
     if (!stackKeys || stackKeys.length < 2) {
-      stackKeys = numericKeys.filter((k) => k !== xKey)
+      stackKeys = numericKeys.filter((k) => k !== resolvedXKey)
     }
     if (stackKeys.length < 2) {
       yKey = stackKeys[0] || yKey
@@ -171,7 +247,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
     return chartWrap(
       <LineChart {...commonProps}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={xKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
+        <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
@@ -184,7 +260,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
     return chartWrap(
       <AreaChart {...commonProps}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={xKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
+        <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
@@ -207,7 +283,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
         <Pie
           data={chartData}
           dataKey={yKey}
-          nameKey={xKey}
+          nameKey={resolvedXKey}
           cx="50%"
           cy="50%"
           outerRadius={isNarrow ? '68%' : 100}
@@ -222,14 +298,14 @@ export default function ChartRenderer({ spec: rawSpec }) {
   }
 
   if (chartType === 'scatter') {
-    const xNum = isNumericLike(sample[xKey])
+    const xNum = isNumericLike(sample[resolvedXKey])
     return chartWrap(
       <ScatterChart margin={commonProps.margin}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
           type={xNum ? 'number' : 'category'}
-          dataKey={xKey}
-          name={xKey}
+          dataKey={resolvedXKey}
+          name={resolvedXKey}
           {...xAxisTickProps}
           minTickGap={isNarrow ? 6 : 10}
         />
@@ -247,7 +323,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" tick={{ fontSize: isNarrow ? 10 : 11 }} />
         <YAxis
-          dataKey={xKey}
+          dataKey={resolvedXKey}
           type="category"
           width={hBarCategoryW}
           tick={{ fontSize: isNarrow ? 9 : 10 }}
@@ -263,7 +339,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
     return chartWrap(
       <BarChart {...commonProps}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={xKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
+        <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
@@ -283,7 +359,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
     return chartWrap(
       <ComposedChart {...commonProps}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={xKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
+        <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis yAxisId="left" tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisRightW} />
         <Tooltip />
@@ -305,7 +381,7 @@ export default function ChartRenderer({ spec: rawSpec }) {
   return chartWrap(
     <BarChart {...commonProps}>
       <CartesianGrid strokeDasharray="3 3" />
-      <XAxis dataKey={xKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
+      <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
       <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
       <Tooltip />
       <Legend wrapperStyle={legendStyle} />
