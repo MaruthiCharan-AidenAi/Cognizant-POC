@@ -1,0 +1,67 @@
+/* ═══════════════════════════════════════
+   TYPING INDICATOR — Ocean Blue + Teal
+═══════════════════════════════════════ */
+
+.typing-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  animation: slideUp .3s ease;
+}
+
+/* ── Bot avatar — matches message-bubble exactly ── */
+.bot-orb {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  box-shadow:
+    0 4px 12px rgba(6, 182, 212, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .2);
+}
+
+.bot-orb-text {
+  font-size: 11px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+/* ── Typing bubble — plain, no card ── */
+.typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Spinning loader icon */
+.spin-icon {
+  color: #0ea5e9;
+  animation: spin .9s linear infinite;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.typing-text {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* ── Animations ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

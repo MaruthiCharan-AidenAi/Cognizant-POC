@@ -1,0 +1,109 @@
+<div class="chat-page">
+  <div class="chat-bg">
+    <div class="cb cb1"></div><div class="cb cb2"></div>
+    <div class="cb cb3"></div><div class="cb cb4"></div>
+    <div class="dot-grid"></div>
+  </div>
+
+  <div class="glass-panel">
+
+    <!-- HEADER -->
+    <header class="chat-header">
+      <div class="header-left">
+        <div>
+          <div class="title-row">
+            <h1 class="title">Analytics Assistant</h1>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- User pill — right side -->
+      <div class="user-pill">
+        @if (user?.role || user?.region) {
+            <p class="subtitle">
+              <span class="role">{{ user?.role }}</span>
+              @if (user?.role && user?.region) { <span class="sep">·</span> }
+              @if (user?.region) { <span>{{ user?.region }}</span> }
+            </p>
+          }
+      </div>
+    </header>
+
+    <!-- ERROR -->
+    <app-error-banner [error]="error" (dismiss)="error = null" />
+
+    <!-- MESSAGES -->
+    <div class="msgs-area">
+      <div class="msgs-inner">
+
+        @if (messages.length === 0) {
+          <div class="welcome">
+            <!-- ✅ Welcome also uses robot icon -->
+            
+            <h2 class="w-title animate-fade-up-1">Hello, {{ firstName }}! </h2>
+            <p class="w-sub animate-fade-up-2">
+              Ask me anything about your analytics data
+            </p>
+            <div class="suggestions animate-fade-up-3">
+              @for (s of suggestions; track s.text) {
+                <button class="s-card" (click)="useSuggestion(s.text)">
+                  <span class="s-text">{{ s.text }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        @for (msg of messages; track msg.id) {
+          @if (!(waitingForFirst && msg.role==='assistant' && msg.content==='' && msg.id===currentId)) {
+            <app-message-bubble [message]="msg" [user]="user" />
+          }
+        }
+        @if (waitingForFirst) { <app-typing-indicator /> }
+        <div #messagesEnd></div>
+      </div>
+    </div>
+
+    <!-- INPUT BAR -->
+    <div class="input-bar">
+      <div class="input-wrap" [class.focused]="focused">
+        <textarea
+          #inputEl
+          [(ngModel)]="inputText"
+          (keydown)="onKeyDown($event)"
+          (input)="autoResize($event)"
+          (focus)="focused=true"
+          (blur)="focused=false"
+          placeholder="Ask me anything about your analytics…"
+          rows="1"
+          [disabled]="sse.isStreaming()"
+          class="chat-input">
+        </textarea>
+
+        <div class="input-bottom">
+          <p class="input-hint">Shift+Enter for new line</p>
+
+          @if (sse.isStreaming()) {
+            <button class="send-btn stop-btn" (click)="sse.stopStream()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="7" y="7" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Stop</span>
+            </button>
+          } @else {
+            <button class="send-btn" (click)="send()" [disabled]="!inputText.trim()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+              </svg>
+              <span>Send</span>
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

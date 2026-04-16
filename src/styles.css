@@ -1,0 +1,296 @@
+/* ============================================================
+   ANALYTICS CHATBOT — GLOBAL STYLES & COLOR SYSTEM
+   Theme: SaaS Dashboard (Sales CRM inspired)
+   Font:  Inter (UI) + JetBrains Mono (code)
+   ============================================================ */
+
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────
+   THEME TOKENS  (use as: bg-[var(--color-primary)] etc.)
+   ────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  /* ── Brand Blue (primary actions, links, active states) ── */
+  --color-primary:          #2563eb;   /* blue-600  — buttons, icons, active nav */
+  --color-primary-hover:    #1d4ed8;   /* blue-700  — hover state */
+  --color-primary-dark:     #1e40af;   /* blue-800  — pressed state */
+  --color-primary-light:    #eff6ff;   /* blue-50   — subtle bg, suggestion cards */
+  --color-primary-border:   #bfdbfe;   /* blue-200  — borders on light blue areas */
+  --color-primary-muted:    #dbeafe;   /* blue-100  — very subtle bg */
+
+  /* ── Page & Surface ── */
+  --color-bg:               #f4f5f7;   /* page background */
+  --color-surface:          #ffffff;   /* cards, panels, header, input */
+  --color-surface-2:        #f8fafc;   /* table headers, secondary panels */
+  --color-surface-3:        #f1f5f9;   /* hover backgrounds */
+
+  /* ── Borders ── */
+  --color-border:           #e5e7eb;   /* gray-200 — default border */
+  --color-border-2:         #d1d5db;   /* gray-300 — stronger border */
+  --color-border-focus:     #2563eb;   /* blue-600 — focused input border */
+
+  /* ── Text ── */
+  --color-text-1:           #111827;   /* gray-900 — headings, strong text */
+  --color-text-2:           #374151;   /* gray-700 — body text */
+  --color-text-3:           #6b7280;   /* gray-500 — secondary / muted */
+  --color-text-4:           #9ca3af;   /* gray-400 — placeholders, hints */
+  --color-text-5:           #d1d5db;   /* gray-300 — dividers, disabled */
+  --color-text-inverse:     #ffffff;   /* white — on dark backgrounds */
+
+  /* ── Navigation ── */
+  --color-nav-bg:           #ffffff;   /* sidebar background */
+  --color-nav-active-bg:    #eff6ff;   /* blue-50  — active nav item bg */
+  --color-nav-active-text:  #1d4ed8;   /* blue-700 — active nav item text */
+  --color-nav-hover-bg:     #f8fafc;   /* hover nav item bg */
+  --color-nav-text:         #374151;   /* default nav text */
+
+  /* ── Status / Semantic Colors ── */
+
+  /* Success — green */
+  --color-success:          #10b981;   /* emerald-500 */
+  --color-success-dark:     #059669;   /* emerald-600 */
+  --color-success-light:    #f0fdf4;   /* green-50 bg */
+  --color-success-border:   #86efac;   /* green-300 border */
+  --color-success-text:     #15803d;   /* green-700 text */
+
+  /* Warning — amber */
+  --color-warning:          #f59e0b;   /* amber-500 */
+  --color-warning-dark:     #d97706;   /* amber-600 */
+  --color-warning-light:    #fffbeb;   /* amber-50 bg */
+  --color-warning-border:   #fcd34d;   /* amber-300 border */
+  --color-warning-text:     #92400e;   /* amber-800 text */
+
+  /* Error / Danger — rose/red */
+  --color-danger:           #f43f5e;   /* rose-500 */
+  --color-danger-dark:      #e11d48;   /* rose-600 */
+  --color-danger-light:     #fff1f2;   /* rose-50 bg */
+  --color-danger-border:    #fda4af;   /* rose-300 border */
+  --color-danger-text:      #be123c;   /* rose-700 text */
+
+  /* Info — teal/cyan */
+  --color-info:             #0891b2;   /* cyan-600 */
+  --color-info-dark:        #0e7490;   /* cyan-700 */
+  --color-info-light:       #ecfeff;   /* cyan-50 bg */
+  --color-info-border:      #a5f3fc;   /* cyan-200 border */
+  --color-info-text:        #155e75;   /* cyan-800 text */
+
+  /* ── Chart / Data Viz Palette ── */
+  --color-chart-1:          #2563eb;   /* blue   — primary series */
+  --color-chart-2:          #0891b2;   /* teal   — secondary series */
+  --color-chart-3:          #10b981;   /* green  — tertiary series */
+  --color-chart-4:          #f59e0b;   /* amber  — quaternary series */
+  --color-chart-5:          #f43f5e;   /* rose   — quinary series */
+  --color-chart-6:          #8b5cf6;   /* violet — extra series */
+  --color-chart-7:          #06b6d4;   /* cyan   — extra series */
+  --color-chart-8:          #ec4899;   /* pink   — extra series */
+
+  /* ── Shadow tokens ── */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:   0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg:   0 4px 12px rgba(0,0,0,.08);
+  --shadow-xl:   0 8px 24px rgba(0,0,0,.10);
+  --shadow-blue: 0 4px 12px rgba(37,99,235,.25);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   BASE RESET & DEFAULTS
+   ────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html, body {
+  height: 100%;
+}
+body {
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--color-text-1);
+  line-height: 1.5;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   SCROLLBAR
+   ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar         { width: 4px; height: 4px; }
+::-webkit-scrollbar-track   { background: transparent; }
+::-webkit-scrollbar-thumb   { background: var(--color-border-2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-4); }
+
+
+/* ──────────────────────────────────────────────────────────
+   MARKDOWN RENDERED CONTENT  (.md-body)
+   ────────────────────────────────────────────────────────── */
+.md-body p       { margin: 6px 0; line-height: 1.65; font-size: 14px; color: var(--color-text-2); }
+.md-body strong  { font-weight: 600; color: var(--color-text-1); }
+.md-body em      { font-style: italic; color: var(--color-text-3); }
+.md-body ul,
+.md-body ol      { padding-left: 20px; margin: 6px 0; font-size: 14px; color: var(--color-text-2); }
+.md-body li      { margin: 3px 0; }
+.md-body h1,.md-body h2,.md-body h3 { font-weight: 600; color: var(--color-text-1); margin: 10px 0 4px; }
+.md-body h1      { font-size: 18px; }
+.md-body h2      { font-size: 16px; }
+.md-body h3      { font-size: 14px; }
+.md-body hr      { border: none; border-top: 1px solid var(--color-border); margin: 10px 0; }
+.md-body a       { color: var(--color-primary); text-decoration: underline; }
+.md-body blockquote {
+  border-left: 3px solid var(--color-primary-border);
+  padding-left: 12px;
+  color: var(--color-text-3);
+  font-style: italic;
+  margin: 8px 0;
+}
+
+/* Code — inline */
+.md-body code {
+  background: var(--color-primary-light);
+  color: var(--color-primary-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* Code — block */
+.md-body pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+.md-body pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Table */
+.md-body table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+  margin: 8px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.md-body th {
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--color-border);
+}
+.md-body td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-surface-3);
+  color: var(--color-text-2);
+}
+.md-body tr:last-child td { border-bottom: none; }
+.md-body tr:hover td      { background: var(--color-surface-3); }
+
+
+/* ──────────────────────────────────────────────────────────
+   REUSABLE COMPONENT CLASSES
+   ────────────────────────────────────────────────────────── */
+
+/* Card */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+.card-hover { transition: box-shadow .15s ease, transform .15s ease; }
+.card-hover:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-blue   { background: var(--color-primary-light);   color: var(--color-primary-hover);  border: 1px solid var(--color-primary-border); }
+.badge-green  { background: var(--color-success-light);   color: var(--color-success-text);   border: 1px solid var(--color-success-border); }
+.badge-amber  { background: var(--color-warning-light);   color: var(--color-warning-text);   border: 1px solid var(--color-warning-border); }
+.badge-red    { background: var(--color-danger-light);    color: var(--color-danger-text);    border: 1px solid var(--color-danger-border); }
+.badge-teal   { background: var(--color-info-light);      color: var(--color-info-text);      border: 1px solid var(--color-info-border); }
+
+/* Spinner */
+.spinner { position: relative; width: 40px; height: 40px; }
+.spinner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--color-border);
+}
+.spinner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--color-primary);
+  animation: spin .75s linear infinite;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   ANIMATIONS
+   ────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.6); opacity: .5; }
+}
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%           { transform: translateY(-5px); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-up    { animation: fadeUp .4s cubic-bezier(.16,1,.3,1) both; }
+.animate-fade-up-1  { animation: fadeUp .4s .07s cubic-bezier(.16,1,.3,1) both; }
+.animate-fade-up-2  { animation: fadeUp .4s .14s cubic-bezier(.16,1,.3,1) both; }
+.animate-fade-up-3  { animation: fadeUp .4s .21s cubic-bezier(.16,1,.3,1) both; }
+.animate-fade-in    { animation: fadeIn .3s ease both; }
+.animate-slide-up   { animation: slideInRight .25s ease both; }
+.animate-pulse-dot  { animation: pulseDot 2s ease-in-out infinite; }
