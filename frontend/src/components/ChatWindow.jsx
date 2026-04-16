@@ -83,14 +83,7 @@ export default function ChatWindow({ token, user, onSignOut }) {
 
     const assistantId = `assistant-${Date.now()}`
     currentAssistantIdRef.current = assistantId
-    const assistantMsg = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      assumptions: [],
-      confidence: null,
-    }
-    setMessages((prev) => [...prev, assistantMsg])
+    let assistantMsgAdded = false
     setWaitingForFirstToken(true)
 
     await startStream({
@@ -99,12 +92,20 @@ export default function ChatWindow({ token, user, onSignOut }) {
       token,
       onChunk: (data) => {
         if (data.type === 'token') {
-          setWaitingForFirstToken(false)
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: m.content + data.content } : m
+          if (!assistantMsgAdded) {
+            assistantMsgAdded = true
+            setWaitingForFirstToken(false)
+            setMessages((prev) => [
+              ...prev,
+              { id: assistantId, role: 'assistant', content: data.content, assumptions: [], confidence: null },
+            ])
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: m.content + data.content } : m
+              )
             )
-          )
+          }
         } else if (data.type === 'confidence') {
           setMessages((prev) =>
             prev.map((m) =>
