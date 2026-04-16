@@ -10,6 +10,7 @@ from models.chat import (
     confidence_level,
 )
 from models.routing import RouterOutput
+from models.suggestions import SuggestionResponse, build_suggestion_questions
 from models.user_context import UserContext, VIEW_MAP, VIEW_SCHEMAS
 
 __all__ = [
@@ -20,8 +21,10 @@ __all__ = [
     "SSEConfidenceChunk",
     "SSEDoneChunk",
     "SSETokenChunk",
+    "SuggestionResponse",
     "UserContext",
     "VIEW_MAP",
     "VIEW_SCHEMAS",
+    "build_suggestion_questions",
     "confidence_level",
 ]

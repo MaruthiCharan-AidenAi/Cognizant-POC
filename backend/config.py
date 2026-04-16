@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     GCP_PROJECT_ID: str
 
     # ── BigQuery ────────────────────────────────────────────────────────
-    BQ_DATASET: str = "rbac_demo"
+    BQ_DATASET: str = "cognizant_poc"
+    # Main source-of-truth table — used for RBAC lookups (people_data.google_email, role, region).
+    BQ_MAIN_TABLE: str = "bqdata"
     # Cap rows returned to the LLM from execute_bigquery_sql (full job still runs; avoids huge prompts).
     BQ_TOOL_MAX_ROWS: int = 500
 

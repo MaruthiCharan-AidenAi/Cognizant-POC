@@ -27,6 +27,7 @@ from auth.google_auth import verify_google_jwt
 from auth.rbac import resolve_user_context, verify_user_email
 from config import settings
 from models.chat import ChatErrorResponse, ChatRequest
+from models.suggestions import SuggestionResponse, build_suggestion_questions
 
 # ── Logging ─────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -77,6 +78,7 @@ app.add_middleware(
         settings.FRONTEND_URL,
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:4200"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -125,6 +127,25 @@ async def login(request: Request) -> dict:
 
 
 # ── Chat ────────────────────────────────────────────────────────────────
+@app.get("/suggestions", response_model=SuggestionResponse)
+async def get_suggestions(request: Request) -> SuggestionResponse:
+    """Return role-aware starter questions derived from the user's schema."""
+    token_payload = await verify_google_jwt(request)
+    email: str = token_payload["email"]
+    user_ctx = await resolve_user_context(email)
+    logger.info(
+        "Suggestion request served: email=%s role=%s region=%s",
+        email,
+        user_ctx.role,
+        user_ctx.region,
+    )
+    return SuggestionResponse(
+        role=user_ctx.role,
+        region=user_ctx.region,
+        suggestions=build_suggestion_questions(user_ctx),
+    )
+
+
 @app.post("/chat")
 async def chat(body: ChatRequest, request: Request) -> EventSourceResponse:
     """Main chat endpoint — SSE streaming response powered by Google ADK.

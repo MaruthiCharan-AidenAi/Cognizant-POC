@@ -43,12 +43,18 @@ def execute_bigquery_sql(sql: str) -> dict[str, Any]:
     """
     client = _get_client()
 
+    # ── LOG the generated SQL for debugging ──────────────────────────────
+    logger.info("=" * 60)
+    logger.info("GENERATED SQL QUERY:")
+    logger.info(sql)
+    logger.info("=" * 60)
+
     # Dry-run first
     try:
         job_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
         client.query(sql, job_config=job_config)
     except Exception as exc:
-        logger.warning("Dry-run failed: %s", exc)
+        logger.warning("Dry-run failed for SQL:\n%s\nError: %s", sql, exc)
         return {"error": f"SQL validation failed: {exc}"}
 
     # Execute
