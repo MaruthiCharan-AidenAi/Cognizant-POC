@@ -11,6 +11,13 @@ import { MessageBubbleComponent } from '../message-bubble/message-bubble.compone
 import { TypingIndicatorComponent } from '../typing-indicator/typing-indicator.component';
 import { ErrorBannerComponent } from '../error-banner/error-banner.component';
 
+const CARD_GRADIENTS = [
+  { from: '#6366f1', to: '#8b5cf6' },
+  { from: '#0891b2', to: '#06b6d4' },
+  { from: '#059669', to: '#10b981' },
+  { from: '#d97706', to: '#f59e0b' },
+];
+
 @Component({
   selector: 'app-chat-window',
   standalone: true,
@@ -33,6 +40,8 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
   currentId                = '';
   focused                  = false;
   sessionId                = generateSessionId();
+  suggestionsLoading       = false;
+  suggestions: Suggestion[] = [];   // empty until API responds
 
   get firstName()  { return this.user?.name?.split(' ')[0] || 'there'; }
   get userInitial(){ return (this.user?.name || this.user?.email || 'U').slice(0,1).toUpperCase(); }
@@ -41,13 +50,6 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
     return this.user?.email || 'User';
   }
 
-  suggestions: Suggestion[] = [
-    { text: 'How many orders were placed last month?',     from: '#6366f1', to: '#8b5cf6' },
-    { text: 'What is the revenue trend over time?',         from: '#0891b2', to: '#06b6d4' },
-    { text: 'Which traffic source drives the most orders?', from: '#059669', to: '#10b981' },
-    { text: 'Show me the top 10 days by order count',       from: '#d97706', to: '#f59e0b' },
-  ];
-
   private shouldScroll = false;
 
   constructor(public sse: SseService, private auth: AuthService) {}
@@ -55,6 +57,7 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
   ngOnInit(): void {
     if (!this.token) this.token = this.auth.token() || '';
     if (!this.user)  this.user  = this.auth.user();
+    this.loadSuggestions();
     setTimeout(() => this.inputEl?.nativeElement.focus(), 100);
   }
 
@@ -65,7 +68,65 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  useSuggestion(t: string): void { this.inputText = t; this.inputEl?.nativeElement.focus(); }
+  /* ── GET /suggestions ── */
+  private async loadSuggestions(): Promise<void> {
+    const token = this.token || this.auth.token();
+    if (!token) return;
+
+    this.suggestionsLoading = true;
+    try {
+      const res = await fetch(apiUrl('/suggestions'), {
+        method:      'GET',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data: {
+        role?:        string;
+        region?:      string;
+        suggestions?: string[];
+      } = await res.json();
+
+      if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+        this.suggestions = data.suggestions.slice(0, 4).map((text, i) => ({
+          text,
+          from: CARD_GRADIENTS[i % CARD_GRADIENTS.length].from,
+          to:   CARD_GRADIENTS[i % CARD_GRADIENTS.length].to,
+        }));
+      }
+
+      // Update role/region if returned
+      if (data.role || data.region) {
+        const current = this.auth.user();
+        if (current) {
+          const updated: User = {
+            ...current,
+            role:   data.role   ?? current.role,
+            region: data.region ?? current.region,
+          };
+          this.auth.user.set(updated);
+          this.user = updated;
+          sessionStorage.setItem('auth_user', JSON.stringify(updated));
+        }
+      }
+
+    } catch (e) {
+      console.warn('GET /suggestions failed:', e);
+      this.suggestions = [];   // empty on error — no defaults
+    } finally {
+      this.suggestionsLoading = false;
+    }
+  }
+
+  useSuggestion(t: string): void {
+    this.inputText = t;
+    this.inputEl?.nativeElement.focus();
+  }
 
   onKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); }
@@ -88,19 +149,15 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
       content:   trimmed,
       timestamp: new Date(),
     };
-    this.messages    = [...this.messages, userMsg];
-    this.inputText   = '';
+    this.messages     = [...this.messages, userMsg];
+    this.inputText    = '';
     this.shouldScroll = true;
 
     const aid = `assistant-${Date.now()}`;
     this.currentId = aid;
     this.messages  = [...this.messages, {
-      id:         aid,
-      role:       'assistant',
-      content:    '',
-      timestamp:  new Date(),
-      assumptions: [],
-      confidence: undefined,
+      id: aid, role: 'assistant', content: '',
+      timestamp: new Date(), assumptions: [], confidence: undefined,
     }];
     this.waitingForFirst = true;
 
@@ -110,41 +167,24 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
       token: this.token,
 
       onChunk: (data) => {
-
-        // ── token: append text content ──────────────────────
         if (data.type === 'token') {
           this.waitingForFirst = false;
           this.messages = this.messages.map(m =>
             m.id === aid ? { ...m, content: m.content + data.content } : m
           );
           this.shouldScroll = true;
-        }
-
-        // ── confidence badge ─────────────────────────────────
-        else if (data.type === 'confidence') {
+        } else if (data.type === 'confidence') {
           this.messages = this.messages.map(m =>
-            m.id === aid
-              ? { ...m, confidence: { score: data.score, level: data.level } }
-              : m
+            m.id === aid ? { ...m, confidence: { score: data.score, level: data.level } } : m
           );
-        }
-
-        // ── assumption flags ─────────────────────────────────
-        else if (data.type === 'assumption') {
+        } else if (data.type === 'assumption') {
           this.messages = this.messages.map(m =>
-            m.id === aid
-              ? { ...m, assumptions: [...(m.assumptions || []), data.text] }
-              : m
+            m.id === aid ? { ...m, assumptions: [...(m.assumptions || []), data.text] } : m
           );
-        }
-
-        // ── chart: backend sends pre-built spec ──────────────
-        // If backend sends {"type":"chart","chart":{...spec...}}
-        // inject it as a ```chart block so message-bubble can parse it
-        else if (data.type === 'chart' && data.chart) {
-          const chartBlock = '\n```chart\n' + JSON.stringify(data.chart) + '\n```\n';
+        } else if (data.type === 'chart' && data.chart) {
+          const block = '\n```chart\n' + JSON.stringify(data.chart) + '\n```\n';
           this.messages = this.messages.map(m =>
-            m.id === aid ? { ...m, content: m.content + chartBlock } : m
+            m.id === aid ? { ...m, content: m.content + block } : m
           );
         }
       },
@@ -158,13 +198,7 @@ export class ChatWindowComponent implements OnInit, AfterViewChecked {
       onDone: () => {
         this.waitingForFirst = false;
         this.shouldScroll    = true;
-
-        // ✅ Force Angular change detection on final message
-        // so message-bubble re-runs ngOnChanges with the full content
-        // (important: chart JSON is only complete after all tokens arrive)
-        this.messages = this.messages.map(m =>
-          m.id === aid ? { ...m } : m
-        );
+        this.messages = this.messages.map(m => m.id === aid ? { ...m } : m);
       },
     });
   }
