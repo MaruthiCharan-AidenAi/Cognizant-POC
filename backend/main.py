@@ -224,7 +224,7 @@ async def chat(body: ChatRequest, request: Request) -> EventSourceResponse:
 
 
 # ── Mock Data ───────────────────────────────────────────────────────────
-@app.get("/mock-data")
+@app.get("/data")
 async def mock_data() -> dict:
     """Return synthetic chart data covering all 8 supported chart types.
 
