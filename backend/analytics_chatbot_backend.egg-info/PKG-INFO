@@ -6,6 +6,7 @@ Requires-Dist: fastapi>=0.111.0
 Requires-Dist: uvicorn[standard]>=0.29.0
 Requires-Dist: google-auth>=2.29.0
 Requires-Dist: google-cloud-bigquery>=3.21.0
+Requires-Dist: google-cloud-aiplatform>=1.70.0
 Requires-Dist: google-adk>=1.0.0
 Requires-Dist: google-genai>=1.0.0
 Requires-Dist: pydantic>=2.7.0

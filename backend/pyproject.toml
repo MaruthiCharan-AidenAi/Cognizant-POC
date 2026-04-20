@@ -7,6 +7,7 @@ dependencies = [
   "uvicorn[standard]>=0.29.0",
   "google-auth>=2.29.0",
   "google-cloud-bigquery>=3.21.0",
+  "google-cloud-aiplatform>=1.70.0",
   "google-adk>=1.0.0",
   "google-genai>=1.0.0",
   "pydantic>=2.7.0",
@@ -27,5 +28,5 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["agents*", "auth*", "jobs*", "middleware*", "models*", "tools*"]
+include = ["agents*", "auth*", "jobs*", "middleware*", "models*", "services*", "tools*"]
 exclude = ["tests*"]

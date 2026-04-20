@@ -16,7 +16,16 @@ middleware/scope_injector.py
 models/__init__.py
 models/chat.py
 models/routing.py
+models/session.py
+models/suggestions.py
 models/user_context.py
+services/__init__.py
+services/chat_history_bq.py
+services/chat_turn.py
+services/embeddings.py
+services/title_generator.py
+services/vector_search.py
 tests/test_scope_injector.py
+tests/test_suggestions.py
 tools/__init__.py
 tools/bigquery_tool.py
