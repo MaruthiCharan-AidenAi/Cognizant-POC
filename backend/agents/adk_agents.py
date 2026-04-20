@@ -16,6 +16,7 @@ Architecture:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -158,6 +159,23 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
             return True
         e = e.__cause__
     return False
+
+
+async def _iter_char_tokens(text: str) -> AsyncGenerator[dict[str, Any], None]:
+    """Yield token payloads with tiny delays for visible progressive typing.
+
+    ADK tool-calling flows may return large text deltas at once. This pacing keeps
+    frontend rendering smooth and GPT-like even when upstream model chunks are coarse.
+    """
+    for ch in text:
+        yield {"type": "token", "content": ch}
+        # Keep pacing subtle: fast enough to finish quickly, slow enough to be visible.
+        if ch in ".!?":
+            await asyncio.sleep(0.01)
+        elif ch == "\n":
+            await asyncio.sleep(0.006)
+        else:
+            await asyncio.sleep(0.003)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -422,6 +440,11 @@ def _get_runner() -> InMemoryRunner:
     return _runner
 
 
+def warmup_runner() -> None:
+    """Eagerly initialize the ADK runner at app startup."""
+    _get_runner()
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # PUBLIC API — called by main.py
 # ═══════════════════════════════════════════════════════════════════════
@@ -515,7 +538,8 @@ Reply policy: Do not paste this block, role, region, view name, or full schema i
                 text_snapshot, delta = _sse_text_delta(text_snapshot, text)
                 if delta:
                     full_response = text_snapshot
-                    yield {"type": "token", "content": delta}
+                    async for token_event in _iter_char_tokens(delta):
+                        yield token_event
 
         if text_snapshot and not full_response:
             full_response = text_snapshot

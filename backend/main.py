@@ -12,21 +12,24 @@ Architecture:
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import json
 import logging
 import time
 from typing import Any, AsyncGenerator
+from pydantic import BaseModel, Field
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
-from agents.adk_agents import run_agent
+from agents.adk_agents import run_agent, warmup_runner
 from auth.google_auth import verify_google_jwt
 from auth.rbac import resolve_user_context, verify_user_email
 from config import settings
 from models.chat import ChatErrorResponse, ChatRequest
+from models.mock_data import MOCK_CHARTS, MOCK_SUMMARY
 from models.suggestions import SuggestionResponse, build_suggestion_questions
 
 # ── Logging ─────────────────────────────────────────────────────────────
@@ -36,12 +39,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Warm heavy singletons once to reduce first-turn latency."""
+    warmup_runner()
+    yield
+
+
 # ── App ─────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Analytics Chatbot API (ADK)",
     version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 
@@ -203,6 +215,101 @@ async def chat(body: ChatRequest, request: Request) -> EventSourceResponse:
                 "region": user_ctx.region,
                 "view": user_ctx.view_name,
                 "question": body.message,
+                "latency_ms": latency_ms,
+                "session_id": body.session_id,
+            })
+        )
+
+    return EventSourceResponse(event_stream())
+
+
+# ── Mock Data ───────────────────────────────────────────────────────────
+@app.get("/mock-data")
+async def mock_data() -> dict:
+    """Return synthetic chart data covering all 8 supported chart types.
+
+    No authentication required — intended for frontend demo / development.
+    Data mimics the real seller-analytics schema but contains no real records.
+
+    Response body:
+      {
+        "summary": "...",
+        "charts": [ <chart-spec>, ... ]   // 8 items, one per chart type
+      }
+    """
+    return {"summary": MOCK_SUMMARY, "charts": MOCK_CHARTS}
+
+
+# ── Drill-Down ───────────────────────────────────────────────────────────
+class DrillDownRequest(BaseModel):
+    """Request body for the drill-down endpoint."""
+    message: str = Field(..., min_length=1, max_length=4000)
+    session_id: str = Field(..., min_length=1, max_length=128)
+    drill_context: dict | None = None
+
+
+@app.post("/drill-down")
+async def drill_down(body: DrillDownRequest, request: Request) -> EventSourceResponse:
+    """Drill-down endpoint — SSE streaming response, same pipeline as /chat.
+
+    Streams tokens as they arrive so the frontend can render text
+    character-by-character while charts and analysis build up progressively.
+    """
+    start_time = time.monotonic()
+
+    token_payload = await verify_google_jwt(request)
+    email: str = token_payload["email"]
+    logger.info(
+        "Drill-down request: email=%s session_id=%s label=%s",
+        email,
+        body.session_id,
+        body.drill_context.get("clicked_label") if body.drill_context else None,
+    )
+
+    user_ctx = await resolve_user_context(email)
+
+    drill_message = body.message
+    if body.drill_context:
+        ctx = body.drill_context
+        drill_message = (
+            f"{body.message}\n\n"
+            f"[Drill-down context: chart='{ctx.get('chart_title')}', "
+            f"segment='{ctx.get('clicked_label')}', value={ctx.get('clicked_value')}, "
+            f"active_filters={ctx.get('filters', {})}, "
+            f"original_chart_type='{ctx.get('original_chart_type')}']"
+            f"\n\nProvide a focused breakdown for this segment with additional charts "
+            f"showing sub-dimensions (e.g. by seller, by date, by program). "
+            f"Use ```chart blocks for each chart. Be concise — no filler text."
+        )
+
+    async def event_stream() -> AsyncGenerator[dict[str, str], None]:
+        try:
+            async for chunk in run_agent(
+                user_message=drill_message,
+                session_id=body.session_id,
+                user_ctx=user_ctx,
+            ):
+                yield {"data": json.dumps(chunk)}
+        except Exception as exc:
+            logger.exception(
+                "Drill-down stream failed: email=%s session_id=%s error=%s",
+                email, body.session_id, exc,
+            )
+            yield {"data": json.dumps({
+                "type": "error",
+                "error": "stream_error",
+                "detail": "Drill-down stream failed. Please retry.",
+            })}
+            yield {"data": json.dumps({"type": "done"})}
+            return
+
+        latency_ms = int((time.monotonic() - start_time) * 1000)
+        logger.info(
+            json.dumps({
+                "user": email,
+                "role": user_ctx.role,
+                "endpoint": "drill_down",
+                "label": body.drill_context.get("clicked_label") if body.drill_context else None,
                 "latency_ms": latency_ms,
                 "session_id": body.session_id,
             })

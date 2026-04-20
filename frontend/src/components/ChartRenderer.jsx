@@ -120,7 +120,12 @@ export function normalizeChartSpec(raw) {
   }
 }
 
-export default function ChartRenderer({ spec: rawSpec }) {
+/**
+ * onSegmentClick(clickedLabel, clickedValue, filters)
+ *   Called when user clicks a chart segment/bar/point.
+ *   Enables drill-down: the parent opens a DrillDownModal with this context.
+ */
+export default function ChartRenderer({ spec: rawSpec, onSegmentClick }) {
   const isNarrow = useIsNarrowScreen()
   const spec = normalizeChartSpec(rawSpec)
   if (!spec) return null
@@ -232,9 +237,47 @@ export default function ChartRenderer({ spec: rawSpec }) {
     chartType = 'bar'
   }
 
+  const drillable = typeof onSegmentClick === 'function'
+
+  // Builds a Recharts onClick handler for bar/line/area/scatter clicks
+  function makeBarClick(xKey, yKey) {
+    if (!drillable) return undefined
+    return (data) => {
+      if (!data) return
+      const label = data[xKey] ?? data.name ?? data.activeLabel ?? ''
+      const value = data[yKey] ?? data.value ?? null
+      const filters = { [xKey]: label }
+      onSegmentClick(String(label), value, filters)
+    }
+  }
+
+  // For pie slices
+  function makePieClick(nameKey, dataKey) {
+    if (!drillable) return undefined
+    return (slice) => {
+      if (!slice) return
+      const label = slice[nameKey] ?? slice.name ?? ''
+      const value = slice[dataKey] ?? slice.value ?? null
+      onSegmentClick(String(label), value, { [nameKey]: label })
+    }
+  }
+
+  const drillCursor = drillable ? 'cursor-pointer' : ''
+  const drillTitle = drillable ? 'Click to drill down' : undefined
+
   const chartWrap = (child) => (
-    <div className="mt-3 w-full min-w-0 max-w-full overflow-x-auto rounded-lg border border-gcp-gray-200 bg-gcp-gray-50 p-2 sm:rounded-xl sm:p-3">
-      <p className="mb-2 break-words text-xs font-semibold text-gcp-gray-700">{title}</p>
+    <div
+      className={`mt-3 w-full min-w-0 max-w-full overflow-x-auto rounded-lg border border-gcp-gray-200 bg-gcp-gray-50 p-2 sm:rounded-xl sm:p-3 ${drillCursor}`}
+      title={drillTitle}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <p className="flex-1 break-words text-xs font-semibold text-gcp-gray-700">{title}</p>
+        {drillable && (
+          <span className="text-[10px] text-gcp-blue bg-gcp-blue/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            Click to drill down
+          </span>
+        )}
+      </div>
       <div className="w-full min-w-[260px] sm:min-w-0" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%" debounce={80}>
           {child}
@@ -245,20 +288,20 @@ export default function ChartRenderer({ spec: rawSpec }) {
 
   if (chartType === 'line') {
     return chartWrap(
-      <LineChart {...commonProps}>
+      <LineChart {...commonProps} onClick={drillable ? (d) => d && makeBarClick(resolvedXKey, yKey)(d.activePayload?.[0]?.payload) : undefined}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
-        <Line type="monotone" dataKey={yKey} stroke="#1a73e8" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey={yKey} stroke="#1a73e8" strokeWidth={2} dot={drillable ? { r: 4, cursor: 'pointer' } : false} activeDot={drillable ? { r: 6, cursor: 'pointer' } : undefined} />
       </LineChart>
     )
   }
 
   if (chartType === 'area') {
     return chartWrap(
-      <AreaChart {...commonProps}>
+      <AreaChart {...commonProps} onClick={drillable ? (d) => d && makeBarClick(resolvedXKey, yKey)(d.activePayload?.[0]?.payload) : undefined}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={resolvedXKey} {...xAxisTickProps} minTickGap={isNarrow ? 6 : 10} />
         <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
@@ -288,6 +331,8 @@ export default function ChartRenderer({ spec: rawSpec }) {
           cy="50%"
           outerRadius={isNarrow ? '68%' : 100}
           label={!isNarrow}
+          onClick={drillable ? makePieClick(resolvedXKey, yKey) : undefined}
+          style={drillable ? { cursor: 'pointer' } : undefined}
         >
           {chartData.map((_, idx) => (
             <Cell key={`cell-${idx}`} fill={SERIES_COLORS[idx % SERIES_COLORS.length]} />
@@ -312,7 +357,13 @@ export default function ChartRenderer({ spec: rawSpec }) {
         <YAxis type="number" dataKey={yKey} name={yKey} tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
         <Tooltip cursor={{ strokeDasharray: '3 3' }} />
         <Legend wrapperStyle={legendStyle} />
-        <Scatter name={title} data={chartData} fill="#1a73e8" />
+        <Scatter
+          name={title}
+          data={chartData}
+          fill="#1a73e8"
+          onClick={drillable ? (point) => makeBarClick(resolvedXKey, yKey)(point) : undefined}
+          style={drillable ? { cursor: 'pointer' } : undefined}
+        />
       </ScatterChart>
     )
   }
@@ -330,7 +381,13 @@ export default function ChartRenderer({ spec: rawSpec }) {
         />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
-        <Bar dataKey={yKey} fill="#1a73e8" radius={[0, 4, 4, 0]} />
+        <Bar
+          dataKey={yKey}
+          fill="#1a73e8"
+          radius={[0, 4, 4, 0]}
+          onClick={drillable ? makeBarClick(resolvedXKey, yKey) : undefined}
+          style={drillable ? { cursor: 'pointer' } : undefined}
+        />
       </BarChart>
     )
   }
@@ -349,6 +406,8 @@ export default function ChartRenderer({ spec: rawSpec }) {
             dataKey={k}
             stackId="stack"
             fill={SERIES_COLORS[idx % SERIES_COLORS.length]}
+            onClick={drillable ? (data) => onSegmentClick(String(data[resolvedXKey] ?? ''), data[k] ?? null, { [resolvedXKey]: data[resolvedXKey], series: k }) : undefined}
+            style={drillable ? { cursor: 'pointer' } : undefined}
           />
         ))}
       </BarChart>
@@ -364,7 +423,14 @@ export default function ChartRenderer({ spec: rawSpec }) {
         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisRightW} />
         <Tooltip />
         <Legend wrapperStyle={legendStyle} />
-        <Bar yAxisId="left" dataKey={yKey} fill="#1a73e8" name={yKey} />
+        <Bar
+          yAxisId="left"
+          dataKey={yKey}
+          fill="#1a73e8"
+          name={yKey}
+          onClick={drillable ? makeBarClick(resolvedXKey, yKey) : undefined}
+          style={drillable ? { cursor: 'pointer' } : undefined}
+        />
         <Line
           yAxisId="right"
           type="monotone"
@@ -385,7 +451,13 @@ export default function ChartRenderer({ spec: rawSpec }) {
       <YAxis tick={{ fontSize: isNarrow ? 10 : 11 }} width={yAxisW} />
       <Tooltip />
       <Legend wrapperStyle={legendStyle} />
-      <Bar dataKey={yKey} fill="#1a73e8" radius={[4, 4, 0, 0]} />
+      <Bar
+        dataKey={yKey}
+        fill="#1a73e8"
+        radius={[4, 4, 0, 0]}
+        onClick={drillable ? makeBarClick(resolvedXKey, yKey) : undefined}
+        style={drillable ? { cursor: 'pointer' } : undefined}
+      />
     </BarChart>
   )
 }

@@ -235,7 +235,7 @@ export default function ChatWindow({ token, user, onSignOut }) {
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} token={token} sessionId={sessionId} />
         ))}
 
         {waitingForFirstToken && <TypingIndicator />}

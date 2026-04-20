@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ConfidenceBadge from './ConfidenceBadge'
 import ChartRenderer, { normalizeChartSpec } from './ChartRenderer'
+import DrillDownModal from './DrillDownModal'
 
 /**
  * Pull a chart spec from ```chart` or from a chart-shaped ```json` block; strip those fences from markdown.
@@ -43,17 +45,29 @@ function extractChartAndMarkdown(content) {
 
 /**
  * MessageBubble — renders a single chat message.
- * 
- * - User messages: right-aligned, dark background
- * - Assistant messages: left-aligned, light background
- * - Renders markdown with react-markdown
- * - Shows confidence badge and assumption flags
+ *
+ * Props:
+ *   message   — the message object
+ *   token     — Google JWT (passed through to DrillDownModal)
+ *   sessionId — current session ID (passed through to DrillDownModal)
  */
-export default function MessageBubble({ message }) {
+export default function MessageBubble({ message, token, sessionId }) {
   const isUser = message.role === 'user'
   const { spec: chartSpec, markdown: markdownContent } = !isUser
     ? extractChartAndMarkdown(message.content)
     : { spec: null, markdown: message.content }
+
+  const [drillCtx, setDrillCtx] = useState(null)
+
+  function handleSegmentClick(clickedLabel, clickedValue, filters) {
+    setDrillCtx({
+      chartTitle: chartSpec?.title || 'Chart',
+      clickedLabel,
+      clickedValue,
+      filters,
+      originalSpec: chartSpec,
+    })
+  }
 
   return (
     <div
@@ -154,7 +168,19 @@ export default function MessageBubble({ message }) {
           )}
         </div>
 
-        {!isUser && chartSpec && <ChartRenderer spec={chartSpec} />}
+        {!isUser && chartSpec && (
+          <ChartRenderer spec={chartSpec} onSegmentClick={handleSegmentClick} />
+        )}
+
+        {drillCtx && (
+          <DrillDownModal
+            open={!!drillCtx}
+            onClose={() => setDrillCtx(null)}
+            drillCtx={drillCtx}
+            token={token}
+            sessionId={sessionId}
+          />
+        )}
 
         {/* Assumptions */}
         {message.assumptions?.length > 0 && (

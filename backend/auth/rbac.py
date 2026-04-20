@@ -25,6 +25,7 @@ Two entry-points:
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import HTTPException, status
 from google.cloud import bigquery
@@ -35,6 +36,8 @@ from models.user_context import VIEW_MAP, UserContext
 logger = logging.getLogger(__name__)
 
 _bq_client: bigquery.Client | None = None
+_user_row_cache: dict[str, tuple[float, dict]] = {}
+_USER_ROW_CACHE_TTL_SECONDS = 300
 
 # ── Role normalisation ───────────────────────────────────────────────────
 # Maps the human-readable role strings stored in people_data.role
@@ -127,6 +130,19 @@ def _query_user_row(email: str) -> dict | None:
     }
 
 
+def _get_cached_user_row(email: str) -> dict | None:
+    """Return cached RBAC row when available; otherwise fetch and cache it."""
+    now = time.monotonic()
+    cached = _user_row_cache.get(email)
+    if cached and (now - cached[0]) < _USER_ROW_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    row = _query_user_row(email)
+    if row is not None:
+        _user_row_cache[email] = (now, row)
+    return row
+
+
 async def verify_user_email(email: str) -> dict:
     """Lightweight login check — confirms the email exists in bqdata.
 
@@ -137,7 +153,7 @@ async def verify_user_email(email: str) -> dict:
         HTTPException(403): Email not found in bqdata / role unrecognised.
         HTTPException(500): BigQuery call failed.
     """
-    row = _query_user_row(email)
+    row = _get_cached_user_row(email)
     if row is None:
         logger.warning("Login denied — no record for %s", email)
         raise HTTPException(
@@ -179,7 +195,7 @@ async def resolve_user_context(email: str) -> UserContext:
         HTTPException(403): Email not found OR role unrecognised OR no view mapping.
         HTTPException(500): BigQuery call failed.
     """
-    row = _query_user_row(email)
+    row = _get_cached_user_row(email)
 
     if row is None:
         logger.warning("Access denied — no record for %s", email)
