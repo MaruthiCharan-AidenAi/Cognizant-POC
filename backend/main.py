@@ -90,7 +90,8 @@ app.add_middleware(
         settings.FRONTEND_URL,
         "http://localhost:3000",
         "http://localhost:5173",
-        "http://localhost:4200"
+        "http://localhost:4200",
+        "https://cognizantpoc-1007459863351.asia-south1.run.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
