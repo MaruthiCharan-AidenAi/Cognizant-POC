@@ -6,6 +6,8 @@ but is entirely synthetic — no real user records.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 MOCK_CHARTS: list[dict] = [
     # ── 1. BAR: Revenue QTD by pod ───────────────────────────────────────
     {
@@ -152,3 +154,107 @@ MOCK_SUMMARY = (
     "Here is a full demo of all supported chart types using synthetic data that "
     "mirrors the seller analytics schema. Each chart is clickable for drill-down."
 )
+
+
+_ROLE_SUMMARY: dict[str, str] = {
+    "seller": (
+        "Seller demo view: personal/team execution metrics with revenue, sessions, "
+        "points, and attainment-focused visuals."
+    ),
+    "ops_lead": (
+        "Ops Lead demo view: operational health across pods/programs with throughput, "
+        "quality, and target progress coverage."
+    ),
+    "quality_analyst": (
+        "Quality Analyst demo view: service quality and customer satisfaction trends "
+        "with TCSAT-heavy chart emphasis."
+    ),
+    "data_contributor": (
+        "Data Contributor demo view: broad cross-functional metrics for exploration "
+        "across revenue, productivity, sessions, and quality."
+    ),
+    "sys_admin": (
+        "System Admin demo view: full-system synthetic observability with complete "
+        "chart coverage for validation and troubleshooting."
+    ),
+    "pex_team": (
+        "PEX Team demo view: performance excellence focus with stronger attainment, "
+        "target tracking, and benchmark-style visuals."
+    ),
+}
+
+_ROLE_CHART_LAYOUTS: dict[str, list[dict]] = {
+    "seller": [
+        {"source_idx": 0, "title": "Revenue QTD by Pod"},
+        {"source_idx": 1, "type": "line", "title": "Daily Revenue Trend"},
+        {"source_idx": 4, "title": "Points Attainment % by Program"},
+        {"source_idx": 7, "title": "Revenue vs Attainment by Pod"},
+    ],
+    "ops_lead": [
+        {"source_idx": 5, "title": "Market Performance (QTD / Forecast / Target)"},
+        {"source_idx": 3, "title": "Sessions by Final Status"},
+        {"source_idx": 7, "type": "bar", "y_key": "attainment_pct", "title": "Attainment % by Pod"},
+        {"source_idx": 1, "type": "area", "title": "Daily Revenue Momentum"},
+    ],
+    "quality_analyst": [
+        {"source_idx": 6, "type": "scatter", "title": "OSAT vs Revenue QTD"},
+        {"source_idx": 3, "type": "pie", "title": "Session Outcome Mix"},
+        {"source_idx": 1, "type": "line", "y_key": "revenue_yesterday", "title": "Daily Trend (Quality Proxy)"},
+        {"source_idx": 4, "type": "horizontal_bar", "y_key": "attainment_pct", "title": "Program Quality-Attainment %"},
+    ],
+    "data_contributor": [
+        {"source_idx": 0, "title": "Revenue QTD by Pod"},
+        {"source_idx": 5, "title": "Market Revenue Stack"},
+        {"source_idx": 6, "title": "OSAT vs Revenue Scatter"},
+        {"source_idx": 7, "title": "Revenue with Attainment Overlay"},
+    ],
+    "sys_admin": [
+        {"source_idx": 0, "title": "Revenue by Pod"},
+        {"source_idx": 1, "title": "Daily Revenue Trend"},
+        {"source_idx": 3, "title": "Session Status Distribution"},
+        {"source_idx": 4, "title": "Attainment by Program"},
+        {"source_idx": 5, "title": "Market Stack"},
+        {"source_idx": 6, "title": "OSAT vs Revenue"},
+        {"source_idx": 7, "title": "Composed Revenue + Attainment"},
+    ],
+    "pex_team": [
+        {"source_idx": 7, "title": "Pod Revenue vs Attainment"},
+        {"source_idx": 4, "title": "Program Attainment %"},
+        {"source_idx": 5, "title": "Target Tracking by Market"},
+        {"source_idx": 0, "type": "horizontal_bar", "title": "Revenue Ranking by Pod"},
+    ],
+}
+
+
+def _build_role_charts(role: str) -> list[dict]:
+    """Create role-specific chart structures (chart types and axis keys)."""
+    layout = _ROLE_CHART_LAYOUTS.get(role, _ROLE_CHART_LAYOUTS["seller"])
+    result: list[dict] = []
+
+    for item in layout:
+        source = deepcopy(MOCK_CHARTS[item["source_idx"]])
+        if item.get("type"):
+            source["type"] = item["type"]
+        if item.get("title"):
+            source["title"] = item["title"]
+        if item.get("x_key"):
+            source["x_key"] = item["x_key"]
+        if item.get("y_key"):
+            source["y_key"] = item["y_key"]
+            source.pop("y_keys", None)
+        if item.get("y_keys"):
+            source["y_keys"] = item["y_keys"]
+            source.pop("y_key", None)
+        if item.get("y_key_2"):
+            source["y_key_2"] = item["y_key_2"]
+        result.append(source)
+
+    return result
+
+
+def get_mock_payload(role: str) -> dict:
+    """Return role-aware synthetic payload for /data."""
+    return {
+        "summary": _ROLE_SUMMARY.get(role, MOCK_SUMMARY),
+        "charts": _build_role_charts(role),
+    }

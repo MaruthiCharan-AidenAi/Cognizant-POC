@@ -29,7 +29,7 @@ from auth.google_auth import verify_google_jwt
 from auth.rbac import resolve_user_context, verify_user_email
 from config import settings
 from models.chat import ChatErrorResponse, ChatRequest
-from models.mock_data import MOCK_CHARTS, MOCK_SUMMARY
+from models.mock_data import get_mock_payload
 from models.suggestions import SuggestionResponse, build_suggestion_questions
 
 # ── Logging ─────────────────────────────────────────────────────────────
@@ -225,19 +225,18 @@ async def chat(body: ChatRequest, request: Request) -> EventSourceResponse:
 
 # ── Mock Data ───────────────────────────────────────────────────────────
 @app.get("/data")
-async def mock_data() -> dict:
-    """Return synthetic chart data covering all 8 supported chart types.
-
-    No authentication required — intended for frontend demo / development.
-    Data mimics the real seller-analytics schema but contains no real records.
-
-    Response body:
-      {
-        "summary": "...",
-        "charts": [ <chart-spec>, ... ]   // 8 items, one per chart type
-      }
-    """
-    return {"summary": MOCK_SUMMARY, "charts": MOCK_CHARTS}
+async def mock_data(request: Request) -> dict:
+    """Return role-aware synthetic chart data for frontend demos."""
+    token_payload = await verify_google_jwt(request)
+    email: str = token_payload["email"]
+    user_ctx = await resolve_user_context(email)
+    logger.info(
+        "Mock data served: email=%s role=%s region=%s",
+        email,
+        user_ctx.role,
+        user_ctx.region,
+    )
+    return get_mock_payload(user_ctx.role)
 
 
 # ── Drill-Down ───────────────────────────────────────────────────────────
